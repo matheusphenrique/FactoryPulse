@@ -1,0 +1,80 @@
+{
+  "versao": 3,
+  "seq": 4,
+  "seqParada": 1,
+  "maquinas": [
+    {
+      "id": 1,
+      "nome": "Máquina 01",
+      "produto": "Parafuso M8 x 40",
+      "operador": "Carlos",
+      "of": "OF-1001",
+      "meta": 12000,
+      "produzido": 0,
+      "of_inicio": "2026-09-22T00:10:44.786Z",
+      "status": "produzindo",
+      "ativa": true
+    },
+    {
+      "id": 2,
+      "nome": "Máquina 02",
+      "produto": "Porca M10",
+      "operador": "Rafaela",
+      "of": "OF-1002",
+      "meta": 20000,
+      "produzido": 0,
+      "of_inicio": "2026-09-22T00:10:44.786Z",
+      "status": "setup",
+      "ativa": true
+    },
+    {
+      "id": 3,
+      "nome": "Máquina 03",
+      "produto": "Arruela 3/8",
+      "operador": "Jonas",
+      "of": "OF-1003",
+      "meta": 30000,
+      "produzido": 0,
+      "of_inicio": "2026-09-22T00:10:44.786Z",
+      "status": "produzindo",
+      "ativa": true
+    },
+    {
+      "id": 4,
+      "nome": "Máquina 04",
+      "produto": "Pino guia",
+      "operador": "",
+      "of": "OF-1004",
+      "meta": 8000,
+      "produzido": 0,
+      "of_inicio": "2026-09-22T00:10:44.786Z",
+      "status": "manutencao",
+      "ativa": true
+    }
+  ],
+  "historicoOF": [],
+  "apontamentos": [],
+  "paradas": [
+    {
+      "id": 1,
+      "maquina_id": 1,
+      "operador": "Fernando",
+      "motivo": "Quebra",
+      "inicio": "2026-09-22T00:24:16.742Z",
+      "fim": "2026-09-22T00:24:20.501Z",
+      "duracao_seg": 4
+    }
+  ],
+  "eventos": [
+    {
+      "maquina_id": 1,
+      "status": "parada",
+      "ts": "2026-09-22T00:24:16.742Z"
+    },
+    {
+      "maquina_id": 1,
+      "status": "produzindo",
+      "ts": "2026-09-22T00:24:20.501Z"
+    }
+  ]
+}

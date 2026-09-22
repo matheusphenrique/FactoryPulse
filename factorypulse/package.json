@@ -1,0 +1,15 @@
+{
+  "name": "factorypulse",
+  "version": "2.1.0",
+  "description": "Monitoramento de produção em tempo real para rede local de fábrica (MES simplificado)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "demo": "node scripts/dados-demo.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}

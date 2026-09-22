@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FactoryPulse</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#0E1116; --card:#171B24; --line:#232936; --line2:#2A3040;
+    --text:#E6E9EF; --muted:#8B93A1; --dim:#6B7280; --blue:#2F6BFF;
+    --green:#2FBF71; --yellow:#E6A817; --red:#E5484D; --cyan:#3B82F6;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif; }
+  button { font-family:inherit; cursor:pointer; }
+  .topbar { border-bottom:1px solid #1C222E; padding:16px 26px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:rgba(14,17,22,.9); backdrop-filter:blur(8px); z-index:10; }
+  .logo { width:26px; height:26px; border-radius:7px; background:linear-gradient(135deg,var(--blue),var(--green)); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:800; }
+  .tabs { display:flex; gap:4px; }
+  .tab { background:transparent; border:1px solid transparent; color:var(--muted); padding:6px 14px; border-radius:8px; font-size:13px; }
+  .tab.active { background:#1E2430; border-color:var(--line2); color:#fff; }
+  .wrap { padding:24px 26px; max-width:1200px; margin:0 auto; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:24px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .kpi .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .kpi .v { font-size:26px; font-weight:800; margin-top:6px; letter-spacing:-1px; }
+  .kpi .s { font-size:11px; color:var(--dim); margin-top:2px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+  .mcard { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .mtop { display:flex; justify-content:space-between; align-items:start; margin-bottom:14px; }
+  .mname { font-size:15px; font-weight:700; }
+  .mprod { font-size:12px; color:var(--muted); margin-top:2px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:12px; padding:3px 10px; border-radius:999px; }
+  .dot { width:8px; height:8px; border-radius:999px; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px; margin-bottom:14px; }
+  .flabel { color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+  .fvalue { color:var(--text); font-weight:600; margin-top:2px; }
+  .barbg { height:6px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .barfill { height:100%; transition:width .5s ease; }
+  .mactions { display:flex; gap:8px; margin-top:14px; }
+  .btn { flex:1; background:transparent; border:1px solid var(--line2); color:#C3C9D4; padding:8px 0; border-radius:8px; font-size:12px; font-weight:600; }
+  .btn.primary { background:var(--blue); border:none; color:#fff; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal { background:var(--card); border:1px solid var(--line2); border-radius:16px; padding:22px; width:400px; max-width:92vw; }
+  .reasons { display:flex; flex-wrap:wrap; gap:8px; }
+  .rbtn { background:#1E2430; border:1px solid var(--line2); color:#C3C9D4; padding:6px 12px; border-radius:999px; font-size:12px; }
+  .rbtn.sel { background:var(--blue); color:#fff; }
+  input, select { width:100%; background:#1E2430; border:1px solid var(--line2); color:var(--text); padding:9px 11px; border-radius:8px; font-size:13px; margin-top:6px; }
+  label { font-size:12px; color:var(--muted); display:block; margin-top:12px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; }
+  .tl-item { display:flex; gap:14px; align-items:center; margin-bottom:16px; position:relative; }
+  .tl-time { font-variant-numeric:tabular-nums; font-weight:700; width:60px; }
+  h3 { margin:0 0 4px; }
+  .sub { font-size:12px; color:var(--muted); margin-bottom:20px; }
+  .empty { color:var(--dim); font-size:13px; padding:20px 0; text-align:center; }
+  select.tlsel { width:auto; display:inline-block; margin:0 0 16px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand"><div class="logo"></div><span>FactoryPulse</span></div>
+  <div class="tabs" id="tabs"></div>
+</div>
+<div class="wrap" id="app"></div>
+
+<script>
+const STATUS = {
+  produzindo:{label:"Produzindo",color:"var(--green)",soft:"rgba(47,191,113,.12)"},
+  setup:{label:"Setup",color:"var(--yellow)",soft:"rgba(230,168,23,.12)"},
+  parada:{label:"Parada",color:"var(--red)",soft:"rgba(229,72,77,.12)"},
+  manutencao:{label:"Manutenção",color:"var(--cyan)",soft:"rgba(59,130,246,.12)"},
+  sem_operador:{label:"Sem operador",color:"var(--muted)",soft:"rgba(139,147,161,.12)"},
+};
+const REASONS = ["Setup","Troca de ferramenta","Quebra","Manutenção preventiva","Manutenção corretiva","Falta de matéria-prima","Esperando empilhadeira","Esperando inspeção","Ajuste","Falta de operador","Outro"];
+let tab = "dashboard";
+let tlMachine = null;
+
+async function api(url, opts) {
+  const r = await fetch(url, opts ? {headers:{"Content-Type":"application/json"}, ...opts} : undefined);
+  return r.json();
+}
+
+function renderTabs() {
+  const t = document.getElementById("tabs");
+  t.innerHTML = [["dashboard","Dashboard"],["timeline","Timeline"],["pareto","Pareto"],["historico","Histórico OF"],["relatorio","Relatórios"],["tv","Modo TV"],["config","Máquinas"]]
+    .map(([k,l])=>`<button class="tab ${tab===k?'active':''}" onclick="setTab('${k}')">${l}</button>`).join("");
+}
+function setTab(k){ tab=k; render(); }
+
+async function render() {
+  renderTabs();
+  const app = document.getElementById("app");
+  if (tab==="dashboard") return renderDashboard(app);
+  if (tab==="timeline") return renderTimeline(app);
+  if (tab==="pareto") return renderPareto(app);
+  if (tab==="historico") return renderHistorico(app);
+  if (tab==="relatorio") return renderRelatorio(app);
+  if (tab==="tv") return renderTV(app);
+  if (tab==="config") return renderConfig(app);
+}
+
+async function renderDashboard(app) {
+  const [resumo, maquinas] = await Promise.all([api("/api/resumo"), api("/api/maquinas")]);
+  const pct = resumo.meta>0 ? Math.round((resumo.producao/resumo.meta)*100) : 0;
+  app.innerHTML = `
+    <div class="kpis">
+      ${kpi("Produzindo",resumo.produzindo,"máquinas ativas","var(--green)")}
+      ${kpi("Paradas",resumo.parada,"requer ação","var(--red)")}
+      ${kpi("Em setup",resumo.setup,"","var(--yellow)")}
+      ${kpi("Atingimento médio",resumo.atingimentoMedio+"%","meta das OFs","var(--blue)")}
+      ${kpi("Tempo perdido",resumo.tempoPerdidoMin+" min","hoje","")}
+      ${kpi("Produção hoje",resumo.producaoHoje.toLocaleString("pt-BR")+" pç","apontada no dia","")}
+    </div>
+    <div class="grid">${maquinas.map(mcard).join("")}</div>`;
+}
+
+function kpi(l,v,s,c){ return `<div class="kpi"><div class="l">${l}</div><div class="v" style="color:${c||'var(--text)'}">${v}</div><div class="s">${s}</div></div>`; }
+
+function mcard(m){
+  const s = STATUS[m.status];
+  const prog = m.meta>0 ? Math.round((m.produzido/m.meta)*100) : 0;
+  const acting = m.paradaAberta
+    ? `<button class="btn primary" onclick="retomar(${m.id})">Finalizar parada</button>`
+    : `<button class="btn" onclick="openStop(${m.id},'${m.nome.replace(/'/g,"")}')">Registrar parada</button>`;
+  return `<div class="mcard" style="border-left:3px solid ${s.color}">
+    <div class="mtop">
+      <div><div class="mname">${m.nome}</div><div class="mprod">${m.produto||"—"}</div></div>
+      <span class="pill" style="background:${s.soft};color:${s.color}"><span class="dot" style="background:${s.color}"></span>${s.label}</span>
+    </div>
+    <div style="background:#1E2430;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:var(--muted)">Ordem de Fabricação</span>
+      <span style="font-weight:700;font-size:13px">${m.of||"—"}</span>
+    </div>
+    <div class="fields">
+      ${field("Operador",m.operador||"—")}${field("Atingimento",m.atingimento+"%")}
+      ${field("Meta da OF",m.meta.toLocaleString("pt-BR"))}${field("Parado hoje",m.stoppedMin+" min")}
+    </div>
+    <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:6px">
+      <span>Produção da OF</span><span style="color:var(--text)">${m.produzido.toLocaleString("pt-BR")} / ${m.meta.toLocaleString("pt-BR")} (${prog}%)</span>
+    </div>
+    <div class="barbg"><div class="barfill" style="width:${Math.min(prog,100)}%;background:${s.color}"></div></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px">Última parada: <span style="color:#C3C9D4">${m.lastStop}</span></div>
+    <div class="mactions">
+      <select onchange="mudarStatus(${m.id},this.value)" style="margin:0">
+        ${Object.keys(STATUS).map(k=>`<option value="${k}" ${m.status===k?'selected':''}>${STATUS[k].label}</option>`).join("")}
+      </select>
+    </div>
+    <div class="mactions"><button class="btn primary" onclick="openApontar(${m.id},'${m.nome.replace(/'/g,"")}')">Apontar produção</button></div>
+    <div class="mactions">
+      ${acting}
+      <button class="btn" onclick="openEncerrar(${m.id},'${m.nome.replace(/'/g,"")}','${(m.of||'').replace(/'/g,"")}')">Encerrar OF</button>
+    </div>
+  </div>`;
+}
+function field(l,v){ return `<div><div class="flabel">${l}</div><div class="fvalue">${v}</div></div>`; }
+
+async function mudarStatus(id,status){ const r=await api(`/api/maquinas/${id}/status`,{method:"POST",body:JSON.stringify({status})}); if(r.erro)alert(r.erro); render(); }
+async function retomar(id){ const r=await api(`/api/maquinas/${id}/retomar`,{method:"POST",body:"{}"}); if(r.erro)alert(r.erro); render(); }
+
+// ---- Modal: apontar produção do turno ----
+function openApontar(id,nome){
+  const bg=document.createElement("div"); bg.className="modal-bg"; bg.onclick=()=>bg.remove();
+  bg.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+    <h3>Apontar produção — ${nome}</h3>
+    <div class="sub">Informe quantas peças foram produzidas <b>neste turno</b>. O sistema soma ao total da OF.</div>
+    <label>Peças produzidas no turno</label><input id="apQtd" type="number" min="1" placeholder="Ex: 2100" />
+    <label>Operador (opcional)</label><input id="apOp" placeholder="Nome de quem lançou" />
+    <div class="mactions" style="margin-top:20px">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">Cancelar</button>
+      <button class="btn primary" onclick="confirmarApontar(${id},this)">Lançar</button>
+    </div></div>`;
+  document.body.appendChild(bg);
+  setTimeout(()=>bg.querySelector("#apQtd").focus(),50);
+}
+async function confirmarApontar(id,btn){
+  const modal=btn.closest(".modal-bg");
+  const qtd=+modal.querySelector("#apQtd").value;
+  const op=modal.querySelector("#apOp").value;
+  if(!qtd||qtd<=0){ alert("Informe uma quantidade válida."); return; }
+  const r=await api(`/api/maquinas/${id}/apontar`,{method:"POST",body:JSON.stringify({qtd,operador:op})});
+  if(r.erro){ alert(r.erro); return; }
+  modal.remove(); render();
+}
+
+// ---- Modal: encerrar OF e abrir nova ----
+function openEncerrar(id,nome,ofAtual){
+  const bg=document.createElement("div"); bg.className="modal-bg"; bg.onclick=()=>bg.remove();
+  bg.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+    <h3>Encerrar OF — ${nome}</h3>
+    <div class="sub">A OF atual <b>${ofAtual||"(sem OF)"}</b> será fechada e guardada no histórico. A produção zera para a nova OF.</div>
+    <label>Nova OF</label><input id="ncOf" placeholder="Ex: OF-1050" />
+    <label>Novo produto (opcional)</label><input id="ncProd" placeholder="Deixe em branco para manter" />
+    <label>Nova meta (peças)</label><input id="ncMeta" type="number" min="0" placeholder="Ex: 10000" />
+    <div class="mactions" style="margin-top:20px">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">Cancelar</button>
+      <button class="btn primary" onclick="confirmarEncerrar(${id},this)">Encerrar e iniciar nova</button>
+    </div></div>`;
+  document.body.appendChild(bg);
+}
+async function confirmarEncerrar(id,btn){
+  const modal=btn.closest(".modal-bg");
+  const novaOf=modal.querySelector("#ncOf").value.trim();
+  const novoProduto=modal.querySelector("#ncProd").value.trim();
+  const novaMeta=modal.querySelector("#ncMeta").value;
+  if(!novaOf){ if(!confirm("Nenhuma nova OF informada. Encerrar mesmo assim e deixar a máquina sem OF?")) return; }
+  const body={novaOf};
+  if(novoProduto) body.novoProduto=novoProduto;
+  if(novaMeta!=="") body.novaMeta=novaMeta;
+  const r=await api(`/api/maquinas/${id}/encerrar-of`,{method:"POST",body:JSON.stringify(body)});
+  if(r.erro){ alert(r.erro); return; }
+  modal.remove(); render();
+}
+
+// ---- Modal de parada ----
+function openStop(id,nome){
+  let sel=null;
+  const bg=document.createElement("div"); bg.className="modal-bg";
+  bg.onclick=()=>bg.remove();
+  bg.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+    <h3>Registrar parada — ${nome}</h3>
+    <div class="sub">Selecione o motivo. A parada será cronometrada até você finalizar.</div>
+    <div class="reasons" id="reasons">${REASONS.map(r=>`<button class="rbtn" data-r="${r}">${r}</button>`).join("")}</div>
+    <label>Operador (opcional)</label><input id="opInput" placeholder="Nome de quem registrou" />
+    <div class="mactions" style="margin-top:20px">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">Cancelar</button>
+      <button class="btn primary" id="confirmStop" disabled style="opacity:.5">Confirmar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
+  bg.querySelectorAll(".rbtn").forEach(b=>b.onclick=()=>{
+    bg.querySelectorAll(".rbtn").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); sel=b.dataset.r;
+    const c=bg.querySelector("#confirmStop"); c.disabled=false; c.style.opacity=1;
+  });
+  bg.querySelector("#confirmStop").onclick=async()=>{
+    const op=bg.querySelector("#opInput").value;
+    const r=await api(`/api/maquinas/${id}/parar`,{method:"POST",body:JSON.stringify({motivo:sel,operador:op})});
+    if(r.erro)alert(r.erro); bg.remove(); render();
+  };
+}
+
+// ---- Timeline ----
+async function renderTimeline(app){
+  const maquinas = await api("/api/maquinas");
+  if(!tlMachine && maquinas.length) tlMachine = maquinas[0].id;
+  const evts = tlMachine ? await api(`/api/maquinas/${tlMachine}/timeline`) : [];
+  app.innerHTML=`<div class="panel">
+    <h3>Linha do tempo</h3><div class="sub">Eventos de hoje</div>
+    <select class="tlsel" onchange="tlMachine=+this.value;render()">
+      ${maquinas.map(m=>`<option value="${m.id}" ${tlMachine==m.id?'selected':''}>${m.nome}</option>`).join("")}
+    </select>
+    <div style="position:relative;padding-left:20px">
+      <div style="position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line)"></div>
+      ${evts.length? evts.map(e=>{
+        const s=STATUS[e.status]; const hora=new Date(e.ts).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+        return `<div class="tl-item">
+          <div style="position:absolute;left:-20px;width:12px;height:12px;border-radius:999px;background:${s.color};border:2px solid var(--bg)"></div>
+          <div class="tl-time">${hora}</div><div style="color:#C3C9D4">${s.label}</div></div>`;
+      }).join("") : '<div class="empty">Sem eventos hoje. Mude o status de uma máquina para começar a registrar.</div>'}
+    </div></div>`;
+}
+
+// ---- Pareto ----
+async function renderPareto(app){
+  const p = await api("/api/pareto");
+  app.innerHTML=`<div class="panel">
+    <h3>Pareto — Motivos de parada</h3><div class="sub">Distribuição do tempo perdido por motivo</div>
+    ${p.length? p.map((x,i)=>{
+      const acc=x.pctAcumulado;
+      return `<div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span>${x.motivo}</span><span style="color:var(--muted)">${x.pct}% · ${x.minutos} min <span style="color:var(--dim)">· acum. ${acc}%</span></span>
+        </div><div class="barbg"><div class="barfill" style="width:${Math.min(x.pct,100)}%;background:var(--blue)"></div></div>
+      </div>`;
+    }).join("") : '<div class="empty">Nenhuma parada finalizada ainda. Registre e finalize paradas para ver o Pareto.</div>'}
+  </div>`;
+}
+
+// ---- Config / criar máquina ----
+async function renderConfig(app){
+  const maquinas = await api("/api/maquinas");
+  app.innerHTML=`<div class="panel" style="margin-bottom:16px">
+    <h3>Adicionar máquina</h3><div class="sub">Cadastre as máquinas reais da sua fábrica</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label>Nome*</label><input id="c_nome" placeholder="Ex: Prensa 12" /></div>
+      <div><label>OF inicial</label><input id="c_of" placeholder="Ex: OF-1050" /></div>
+      <div><label>Produto</label><input id="c_prod" placeholder="Ex: Suporte L" /></div>
+      <div><label>Operador</label><input id="c_op" placeholder="Nome" /></div>
+      <div><label>Meta (peças)</label><input id="c_meta" type="number" placeholder="0" /></div>
+    </div>
+    <button class="btn primary" style="margin-top:16px;flex:none;padding:9px 20px" onclick="criar()">Adicionar máquina</button>
+  </div>
+  <div class="panel"><h3>Máquinas ativas</h3><div class="sub">${maquinas.length} no total. Máquinas desativadas saem desta lista, mas o histórico delas é mantido nos relatórios.</div>
+    ${maquinas.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)">
+      <span>${m.nome} <span style="color:var(--dim)">· ${m.produto||"sem produto"}</span></span>
+      <span style="display:flex;align-items:center;gap:14px">
+        <span style="color:var(--muted)">meta ${m.meta.toLocaleString("pt-BR")}</span>
+        <button onclick="excluir(${m.id},'${m.nome.replace(/'/g,"")}')" style="background:transparent;border:1px solid var(--line2);color:var(--red);padding:5px 12px;border-radius:8px;font-size:12px">Desativar</button>
+      </span></div>`).join("")}
+  </div>`;
+}
+async function excluir(id,nome){
+  if(!confirm(`Desativar "${nome}"? Ela sai do painel, mas o histórico de produção e paradas é mantido nos relatórios.`)) return;
+  const r=await api(`/api/maquinas/${id}`,{method:"DELETE"});
+  if(r.erro) alert(r.erro);
+  render();
+}
+async function criar(){
+  const nome=document.getElementById("c_nome").value.trim();
+  if(!nome){ alert("O nome da máquina é obrigatório."); return; }
+  const r=await api("/api/maquinas",{method:"POST",body:JSON.stringify({
+    nome, of:document.getElementById("c_of").value,
+    produto:document.getElementById("c_prod").value,
+    operador:document.getElementById("c_op").value,
+    meta:+document.getElementById("c_meta").value||0 })});
+  if(r.erro){ alert(r.erro); return; }
+  render();
+}
+
+// ---- Histórico de OFs encerradas ----
+async function renderHistorico(app){
+  const h = await api("/api/historico-of");
+  app.innerHTML=`<div class="panel">
+    <h3>Histórico de OFs encerradas</h3><div class="sub">Cada ordem de fabricação finalizada, com o que foi produzido.</div>
+    ${h.length? tabela(["OF","Máquina","Produto","Meta","Produzido","Atingim.","Encerrada em"],
+      h.map(x=>[x.of,x.maquina_nome,x.produto||"—",x.meta.toLocaleString("pt-BR"),x.produzido.toLocaleString("pt-BR"),x.atingimento+"%",x.fimFmt]))
+      : '<div class="empty">Nenhuma OF encerrada ainda. Use o botão "Encerrar OF" no card da máquina.</div>'}
+  </div>`;
+}
+
+// ---- Relatórios ----
+let relData = null;
+async function renderRelatorio(app){
+  const hoje = diaLocalNavegador();
+  app.innerHTML=`<div class="panel">
+    <h3>Relatórios</h3><div class="sub">Produção apontada, paradas e Pareto do dia escolhido. Exporte em PDF ou Excel.</div>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div><label>Dia</label><input type="date" id="relDia" value="${hoje}" style="width:auto"/></div>
+      <button class="btn" style="flex:none;padding:9px 18px" onclick="carregarRel()">Ver</button>
+      <button class="btn" style="flex:none;padding:9px 18px" onclick="exportPDF()">Baixar PDF</button>
+      <button class="btn" style="flex:none;padding:9px 18px" onclick="exportXLS()">Baixar Excel</button>
+    </div>
+    <div id="relView" style="margin-top:22px"></div>
+  </div>`;
+  carregarRel();
+}
+async function carregarRel(){
+  const dia = document.getElementById("relDia").value;
+  relData = await api("/api/relatorio?dia="+dia);
+  if(relData.erro){ document.getElementById("relView").innerHTML=`<div class="empty">${relData.erro}</div>`; relData=null; return; }
+  const t = relData.totais;
+  document.getElementById("relView").innerHTML = `
+    <div class="kpis" style="margin-bottom:20px">
+      ${kpi("Produção do dia",t.producao.toLocaleString("pt-BR")+" pç",t.apontamentos+" apontamento(s)","var(--blue)")}
+      ${kpi("Paradas",t.paradas,"finalizadas no dia","")}
+      ${kpi("Tempo parado",t.tempoParadoMin+" min","no dia","var(--red)")}
+    </div>
+    <h4 style="margin:0 0 10px">Produção por máquina</h4>
+    ${tabela(COLS_PROD, relData.producao.map(linhaProd))}
+    <h4 style="margin:24px 0 10px">Registro de paradas</h4>
+    ${relData.paradas.length? tabela(["Máquina","Motivo","Operador","Início","Fim","Duração (min)"],
+      relData.paradas.map(p=>[p.maquina,p.motivo,p.operador,p.inicio,p.fim,p.duracaoMin]))
+      : '<div class="empty">Nenhuma parada finalizada neste dia.</div>'}`;
+}
+const COLS_PROD = ["Máquina","OF(s)","Operador(es)","Apontamentos","Produzido no dia","Paradas","Parado (min)"];
+const linhaProd = r=>[r.maquina,r.ofs,r.operadores,r.apontamentos,r.produzidoDia,r.paradas,r.tempoParadoMin];
+function diaLocalNavegador(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function tabela(head, rows){
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr>${head.map(h=>`<th style="text-align:left;padding:8px;border-bottom:1px solid var(--line2);color:var(--muted);font-weight:600">${h}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td style="padding:8px;border-bottom:1px solid var(--line);color:#C3C9D4">${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function exportPDF(){
+  if(!relData) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(16); doc.text("FactoryPulse — Relatório de Produção", 14, 18);
+  doc.setFontSize(10); doc.setTextColor(120);
+  doc.text("Dia: "+relData.dia, 14, 25);
+  doc.text(`Produção do dia: ${relData.totais.producao.toLocaleString("pt-BR")} pç  |  Paradas: ${relData.totais.paradas}  |  Tempo parado: ${relData.totais.tempoParadoMin} min`, 14, 31);
+  doc.autoTable({ startY:38, head:[COLS_PROD],
+    body: relData.producao.map(linhaProd),
+    styles:{fontSize:8}, headStyles:{fillColor:[47,107,255]} });
+  if(relData.paradas.length){
+    doc.text("Paradas", 14, doc.lastAutoTable.finalY+10);
+    doc.autoTable({ startY:doc.lastAutoTable.finalY+14, head:[["Máquina","Motivo","Operador","Início","Fim","Min"]],
+      body: relData.paradas.map(p=>[p.maquina,p.motivo,p.operador,p.inicio,p.fim,p.duracaoMin]),
+      styles:{fontSize:8}, headStyles:{fillColor:[229,72,77]} });
+  }
+  doc.save(`relatorio-${relData.dia}.pdf`);
+}
+function exportXLS(){
+  if(!relData) return;
+  const wb = XLSX.utils.book_new();
+  const prod = [COLS_PROD, ...relData.producao.map(linhaProd)];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prod), "Produção");
+  const par = [["Máquina","Motivo","Operador","Início","Fim","Duração (min)"],
+    ...relData.paradas.map(p=>[p.maquina,p.motivo,p.operador,p.inicio,p.fim,p.duracaoMin])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(par), "Paradas");
+  const pt = [["Motivo","%","% acumulado","Minutos"], ...relData.pareto.map(p=>[p.motivo,p.pct,p.pctAcumulado,p.minutos])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pt), "Pareto");
+  XLSX.writeFile(wb, `relatorio-${relData.dia}.xlsx`);
+}
+
+// ---- Modo TV (telão da fábrica) ----
+let tvTimer = null;
+async function renderTV(app){
+  const [resumo, maquinas] = await Promise.all([api("/api/resumo"), api("/api/maquinas")]);
+  const pct = resumo.meta>0?Math.round((resumo.producao/resumo.meta)*100):0;
+  document.querySelector(".topbar").style.display = "none";
+  document.querySelector(".wrap").style.maxWidth = "none";
+  app.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="logo" style="width:40px;height:40px"></div>
+        <div style="font-size:32px;font-weight:800">FactoryPulse</div>
+      </div>
+      <button class="btn" style="flex:none;padding:10px 20px" onclick="sairTV()">Sair do Modo TV</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+      ${tvKpi("PRODUZINDO",resumo.produzindo,"var(--green)")}
+      ${tvKpi("PARADAS",resumo.parada,"var(--red)")}
+      ${tvKpi("ATINGIMENTO",resumo.atingimentoMedio+"%","var(--blue)")}
+      ${tvKpi("META",pct+"%","var(--text)")}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+      ${maquinas.map(m=>{
+        const s=STATUS[m.status]; const p=m.meta>0?Math.round((m.produzido/m.meta)*100):0;
+        return `<div style="background:var(--card);border:1px solid var(--line);border-left:6px solid ${s.color};border-radius:16px;padding:22px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:24px;font-weight:800">${m.nome}</div>
+            <span class="dot" style="width:20px;height:20px;background:${s.color}"></span>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:${s.color};margin:6px 0 14px">${s.label}</div>
+          <div style="font-size:15px;color:var(--muted)">${m.produto||"—"} · ${m.operador||"—"}</div>
+          <div style="font-size:34px;font-weight:800;margin-top:12px">${p}%</div>
+          <div class="barbg" style="height:10px;margin-top:8px"><div class="barfill" style="width:${Math.min(p,100)}%;background:${s.color}"></div></div>
+        </div>`;
+      }).join("")}
+    </div>`;
+  clearInterval(tvTimer);
+  tvTimer = setInterval(()=>{ if(tab==="tv") renderTV(document.getElementById("app")); }, 5000);
+}
+function tvKpi(l,v,c){ return `<div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;text-align:center">
+  <div style="font-size:14px;color:var(--muted);letter-spacing:1px">${l}</div>
+  <div style="font-size:52px;font-weight:800;color:${c};margin-top:4px">${v}</div></div>`; }
+function sairTV(){ clearInterval(tvTimer); document.querySelector(".topbar").style.display=""; setTab("dashboard"); }
+
+// Atualiza o dashboard sozinho a cada 5s
+setInterval(()=>{ if(tab==="dashboard") renderDashboard(document.getElementById("app")); }, 5000);
+render();
+</script>
+</body>
+</html>
